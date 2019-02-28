@@ -2,34 +2,45 @@ class Blob {
   constructor(blobComplexity, blobSize)
   {
     this.points = [];
-    const pathParts = [];
-
-    let pointIndex = blobComplexity;
+    this.blobComplexity = blobComplexity;
+    this.blobSize = blobSize;
 
     const position = {
       x: Math.random() * window.canvas.getAttribute('width'),
       y: Math.random() * window.canvas.getAttribute('height')
     };
 
-    const centerPoint = new Point({
+    this.centerPoint = new Point({
       position,
-      // hidden: true
+      hidden: false
     });
 
-    const radius = blobSize + (Math.random() * blobSize);
+    this.radius = blobSize + (Math.random() * blobSize);
+    this.slice = 2 * Math.PI / this.blobComplexity;
+
     // const radius = blobSize;
+    let pointIndex = this.blobComplexity;
 
     while (pointIndex > 0) {
-      const pointRadius = radius + (Math.random() - Math.random()) * blobSize;
       // const pointRadius = radius;
-      const slice = 2 * Math.PI / blobComplexity;
-      this.createBlobPoint(centerPoint, pointRadius, pointIndex, slice);
+      this.points.push(this.createBlobPoint(pointIndex));
       pointIndex--;
     }
 
+    this.blobPath = document.createElementNS(svgNamespace, 'path');
+    window.canvas.appendChild(this.blobPath);
+
+    this.drawBody();
+  }
+
+  drawBody()
+  {
+    const pathParts = [];
+    let pointIndex = 0;
+
     // Move to first point
-    const lastPoint = this.points[blobComplexity - 1];
-    const firstPoint = this.points[0];
+    const lastPoint = this.points[this.blobComplexity - 1].position;
+    const firstPoint = this.points[0].position;
 
     const startPoint = {
       x: (lastPoint.x + firstPoint.x) / 2,
@@ -39,9 +50,9 @@ class Blob {
     pathParts.push(`M${startPoint.x}, ${startPoint.y}`);
 
     // Create continuous bezier curve parts
-    while (pointIndex < blobComplexity - 1) {
-      const currentPoint = this.points[pointIndex];
-      const nextPoint = this.points[pointIndex + 1];
+    while (pointIndex < this.blobComplexity - 1) {
+      const currentPoint = this.points[pointIndex].position;
+      const nextPoint = this.points[pointIndex + 1].position;
 
       const controlPoint = {
         x: (currentPoint.x + nextPoint.x) / 2,
@@ -55,7 +66,7 @@ class Blob {
     }
 
     // Add last curve
-    const currentPoint = this.points[blobComplexity - 1];
+    const currentPoint = this.points[this.blobComplexity - 1].position;
 
     const endPoint = {
       x: (currentPoint.x + firstPoint.x) / 2,
@@ -65,31 +76,33 @@ class Blob {
     pathParts.push(`Q${currentPoint.x}, ${currentPoint.y}`);
     pathParts.push(`${endPoint.x}, ${endPoint.y}`);
 
-    const blobPath = document.createElementNS(svgNamespace, 'path');
-
-    utils.setProperties(blobPath, {
+    utils.setProperties(this.blobPath, {
       d: pathParts.join(' '),
-      fill: 'rgba(125, 111, 111, .5)'
+      fill: 'rgba(50, 155, 151, .8)'
     });
-
-    window.canvas.appendChild(blobPath);
   }
 
-  createBlobPoint(centerPoint, radius, pointIndex, slice)
+  createBlobPoint(pointIndex)
   {
-    const angle = pointIndex * slice;
+    const angle = pointIndex * this.slice;
+    const pointRadius = this.radius + (Math.random() - Math.random()) * this.blobSize;
 
     const position = {
-      x: centerPoint.x + radius * Math.cos(angle),
-      y: centerPoint.y + radius * Math.sin(angle)
+      x: this.centerPoint.x + pointRadius * Math.cos(angle),
+      y: this.centerPoint.y + pointRadius * Math.sin(angle)
     };
 
-    this.points.push(position);
-
-    const blobPoint = new Point({
+    new Point({
       position,
-      // hidden: true
+      hidden: false
     });
+
+    return {
+      position: position,
+      randomSeed: Math.random() * 1000,
+      randomSeed2: 15 + Math.random() * 5,
+      randomSeed3: Math.random()
+    };
   }
 }
 
@@ -118,6 +131,7 @@ class BlobCanvas
 {
   constructor(blobCount = 10, blobComplexity = 5, blobSize = 20)
   {
+    this.time = 0;
     this.blobs = [];
     this.canvas = document.createElementNS(svgNamespace, 'svg');
     this.animationFrameBound = this.animationFrame.bind(this);
@@ -136,7 +150,7 @@ class BlobCanvas
     }
 
     // Start animation
-    window.requestAnimationFrame(this.animationFrameBound);
+    this.animationFrameBound();
   }
 
   createBlobs(blobComplexity, blobSize)
@@ -147,9 +161,26 @@ class BlobCanvas
 
   animationFrame()
   {
+    window.requestAnimationFrame(this.animationFrameBound);
+
     for (let blobIndex = 0; blobIndex < this.blobs.length; blobIndex++) {
       const blob = this.blobs[blobIndex];
+
+      let pointIndex = blob.blobComplexity - 1;
+
+      while (pointIndex > -1) {
+        const angle = pointIndex * blob.slice;
+        const point = blob.points[pointIndex];
+        const currentFrame = point.randomSeed + this.time;
+        point.position.x += Math.sin(currentFrame / point.randomSeed2) * point.randomSeed3;
+        point.position.y -= Math.cos(currentFrame / point.randomSeed2) * point.randomSeed3;
+        pointIndex--;
+      }
+
+      blob.drawBody();
     }
+
+    this.time++;
   }
 }
 
@@ -165,4 +196,4 @@ class BlobUtils
 
 const svgNamespace = 'http://www.w3.org/2000/svg';
 const utils = new BlobUtils();
-new BlobCanvas(10, 10, 100);
+new BlobCanvas(1, 10, 100);
