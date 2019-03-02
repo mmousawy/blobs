@@ -92,16 +92,17 @@ class Blob {
       y: this.centerPoint.y + pointRadius * Math.sin(angle)
     };
 
-    new Point({
-      position,
-      hidden: false
-    });
-
     return {
       position: position,
       randomSeed: Math.random() * 1000,
       randomSeed2: 15 + Math.random() * 5,
-      randomSeed3: Math.random()
+      randomSeed3: 15 + Math.random() * 5,
+      randomSeed4: Math.random() * .5 + .5,
+      randomSeed5: Math.random() * .5 + .5,
+      object: new Point({
+        position,
+        hidden: false
+      })
     };
   }
 }
@@ -111,28 +112,40 @@ class Point {
   {
     this.x = props.position.x;
     this.y = props.position.y;
+    this.hidden = props.hidden || false;
+    this.body = document.createElementNS(svgNamespace, 'circle');
+    window.canvas.appendChild(this.body);
+  }
 
-    if (!props.hidden) {
-      const pointCircle = document.createElementNS(svgNamespace, 'circle');
-
-      utils.setProperties(pointCircle, {
+  draw()
+  {
+    if (!this.hidden) {
+      utils.setProperties(this.body, {
         cx: this.x,
         cy: this.y,
         r: 2,
         fill: '#202020'
       });
-
-      window.canvas.appendChild(pointCircle);
     }
   }
 }
 
 class BlobCanvas
 {
-  constructor(blobCount = 10, blobComplexity = 5, blobSize = 20)
+  constructor(blobCount = 10, blobComplexity = 5, blobSize = 20, mouseRadius = 200)
   {
     this.time = 0;
     this.blobs = [];
+    this.mouseRadiusHalf = mouseRadius * .5;
+    this.mouseVelocity = {
+      x: null,
+      y: null
+    };
+    this.mousePosition = {
+      x: null,
+      y: null
+    };
+
     this.canvas = document.createElementNS(svgNamespace, 'svg');
     this.animationFrameBound = this.animationFrame.bind(this);
 
@@ -145,12 +158,26 @@ class BlobCanvas
     window.canvas = this.canvas;
 
     while (blobCount > 0) {
-      this.createBlobs(blobComplexity, blobSize);
+      this.createBlobs(Math.max(3, Math.round(blobComplexity * .5 + blobComplexity * .5 * Math.random())), blobSize);
       blobCount--;
     }
 
     // Start animation
     this.animationFrameBound();
+
+    // Start mousemove listener
+    window.addEventListener('mousemove', this.mouseHandler.bind(this));
+  }
+
+  mouseHandler(event)
+  {
+    if (this.mousePosition.x) {
+      this.mouseVelocity.x = event.clientX - this.mousePosition.x;
+      this.mouseVelocity.y = event.clientY - this.mousePosition.y;
+    }
+
+    this.mousePosition.x = event.clientX;
+    this.mousePosition.y = event.clientY;
   }
 
   createBlobs(blobComplexity, blobSize)
@@ -163,6 +190,13 @@ class BlobCanvas
   {
     window.requestAnimationFrame(this.animationFrameBound);
 
+    const mouseRect = {
+      top: this.mousePosition.y - this.mouseRadiusHalf,
+      right: this.mousePosition.x + this.mouseRadiusHalf,
+      bottom: this.mousePosition.y + this.mouseRadiusHalf,
+      left: this.mousePosition.x - this.mouseRadiusHalf
+    };
+
     for (let blobIndex = 0; blobIndex < this.blobs.length; blobIndex++) {
       const blob = this.blobs[blobIndex];
 
@@ -172,8 +206,31 @@ class BlobCanvas
         const angle = pointIndex * blob.slice;
         const point = blob.points[pointIndex];
         const currentFrame = point.randomSeed + this.time;
-        point.position.x += Math.sin(currentFrame / point.randomSeed2) * point.randomSeed3;
-        point.position.y -= Math.cos(currentFrame / point.randomSeed2) * point.randomSeed3;
+
+        point.position.x += Math.cos(angle) * point.randomSeed4 * Math.cos(currentFrame / point.randomSeed2);
+        point.position.y -= Math.sin(angle) * point.randomSeed5 * Math.sin(currentFrame / point.randomSeed3);
+
+        // Check bluntly if the point is in distance to be affected by the mouse radius
+        if (point.position.x > mouseRect.left && point.position.x < mouseRect.right && point.position.y > mouseRect.top && point.position.y < mouseRect.bottom) {
+          const deltaX = point.position.x - this.mousePosition.x;
+          const deltaY = point.position.y - this.mousePosition.y;
+          const strength = Math.max(0, this.mouseRadiusHalf - Math.hypot(deltaX, deltaY));
+          const mouseAngle = Math.atan2(deltaY, deltaX);
+
+          const effect = {
+            x: Math.cos(mouseAngle) * strength,
+            y: Math.sin(mouseAngle) * strength
+          };
+
+          point.position.x += effect.x;
+          point.position.y += effect.y;
+        }
+
+        point.object.x = point.position.x;
+        point.object.y = point.position.y;
+
+        point.object.draw();
+
         pointIndex--;
       }
 
@@ -196,4 +253,4 @@ class BlobUtils
 
 const svgNamespace = 'http://www.w3.org/2000/svg';
 const utils = new BlobUtils();
-new BlobCanvas(1, 10, 100);
+new BlobCanvas(1, 10, 50);
