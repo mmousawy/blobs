@@ -12,7 +12,7 @@ class Blob {
 
     this.centerPoint = new Point({
       position,
-      hidden: false
+      hidden: true
     });
 
     this.radius = blobSize + (Math.random() * blobSize);
@@ -94,6 +94,14 @@ class Blob {
 
     return {
       position: position,
+      anchor: {
+        x: position.x,
+        y: position.y
+      },
+      velocity: {
+        x: 0,
+        y: 0
+      },
       randomSeed: Math.random() * 1000,
       randomSeed2: 15 + Math.random() * 5,
       randomSeed3: 15 + Math.random() * 5,
@@ -101,7 +109,7 @@ class Blob {
       randomSeed5: Math.random() * .5 + .5,
       object: new Point({
         position,
-        hidden: false
+        hidden: true
       })
     };
   }
@@ -207,24 +215,28 @@ class BlobCanvas
         const point = blob.points[pointIndex];
         const currentFrame = point.randomSeed + this.time;
 
-        point.position.x += Math.cos(angle) * point.randomSeed4 * Math.cos(currentFrame / point.randomSeed2);
-        point.position.y -= Math.sin(angle) * point.randomSeed5 * Math.sin(currentFrame / point.randomSeed3);
+        point.velocity.x += Math.cos(angle) * point.randomSeed4 * Math.cos(currentFrame / point.randomSeed2) * .2;
+        point.velocity.y -= Math.sin(angle) * point.randomSeed5 * Math.sin(currentFrame / point.randomSeed3) * .2;
 
         // Check bluntly if the point is in distance to be affected by the mouse radius
         if (point.position.x > mouseRect.left && point.position.x < mouseRect.right && point.position.y > mouseRect.top && point.position.y < mouseRect.bottom) {
           const deltaX = point.position.x - this.mousePosition.x;
           const deltaY = point.position.y - this.mousePosition.y;
-          const strength = Math.max(0, this.mouseRadiusHalf - Math.hypot(deltaX, deltaY));
+          const strength = Math.max(0, this.mouseRadiusHalf - Math.hypot(deltaX, deltaY)) * .02;
           const mouseAngle = Math.atan2(deltaY, deltaX);
 
-          const effect = {
-            x: Math.cos(mouseAngle) * strength,
-            y: Math.sin(mouseAngle) * strength
-          };
-
-          point.position.x += effect.x;
-          point.position.y += effect.y;
+          point.velocity.x += Math.cos(mouseAngle) * strength;
+          point.velocity.y += Math.sin(mouseAngle) * strength
         }
+
+        point.velocity.x += (point.anchor.x - point.position.x) * .01;
+        point.velocity.y += (point.anchor.y - point.position.y) * .01;
+
+        point.position.x += point.velocity.x;
+        point.position.y += point.velocity.y;
+
+        point.velocity.x *= .95;
+        point.velocity.y *= .95;
 
         point.object.x = point.position.x;
         point.object.y = point.position.y;
@@ -253,4 +265,4 @@ class BlobUtils
 
 const svgNamespace = 'http://www.w3.org/2000/svg';
 const utils = new BlobUtils();
-new BlobCanvas(1, 10, 50);
+new BlobCanvas(10, 10, 100, 200);
